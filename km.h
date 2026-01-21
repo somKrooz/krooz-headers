@@ -1,5 +1,5 @@
 #pragma once
-#ifndef KM_H
+#ifndef KM_H // KM_H
 #define KM_H
 #include <math.h>
 #include <string.h>
@@ -7,9 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 typedef struct {
-    float value[3][3];
-} matrix3;
+    float m[16];
+} matrix4;
 
 typedef struct {
     float x;
@@ -20,11 +21,8 @@ typedef struct {
     float r;
     float g;
     float b;
-} vec3;
+} vector3;
 
-typedef struct {
-    float value[9];
-}matrix3_FLAT;
 
 #ifndef KM_INLINE
   #ifdef __cplusplus
@@ -129,93 +127,82 @@ typedef struct {
         return vector2Normalize(r);
     }
 
-    KM_INLINE matrix3 m3identity()
+    KM_INLINE matrix4 m4identity()
     {
-        matrix3 m = {{{1.0f, 0.0f, 0.0f},
-                {0.0f, 1.0f, 0.0f},
-                {0.0f, 0.0f, 1.0f}}};
-        return m;
-    }  
+        matrix4 iden = {0};
+        iden.m[0] = 1;
+        iden.m[5] = 1;
+        iden.m[10] = 1;
+        iden.m[15] = 1;
 
-    KM_INLINE matrix3_FLAT m3toPlain(matrix3 mat)
-    {
-        matrix3_FLAT r = {0};
-        for (int i = 0; i < 3; ++i){
-            for (int j = 0; j < 3; ++j){
-                r.value[i * 3 + j] = mat.value[i][j];
-            }
-        }
-        return r;
+        return iden;
     }
-
-    KM_INLINE matrix3 mult(matrix3 a , matrix3 b)
+    KM_INLINE matrix4 m4multiplication(matrix4 a , matrix4 b)
     {
-        matrix3 result = {0};
-        for (int row = 0; row < 3; row++)
-        {
-            for (int col = 0; col < 3; col++)
+        matrix4 result = {0};
+        for (int row = 0; row < 4; row++){
+            for (int col = 0; col < 4; col++)
             {
-                result.value[row][col] = 
-                    a.value[row][0] * b.value[0][col] +
-                    a.value[row][1] * b.value[1][col] +
-                    a.value[row][2] * b.value[2][col];
-
+                float sum = 0.0f;
+                for (int k = 0; k < 4; k++) 
+                {
+                    sum += a.m[k*4 + row] * b.m[col*4 + k];
+                }
+                result.m[col * 4 + row] = sum;
             }
         }
         return result;
-    }
+    };
 
-    KM_INLINE matrix3 m3translate(matrix3 mat,vector2 position)
+    KM_INLINE matrix4 m4Translate(matrix4 mat, vector2 v)  
     {
-        matrix3 m = {{{1, 0, position.x},
-                   {0, 1, position.y},
-                   {0, 0, 1}}};
-
-        return mult(m , mat);
+        matrix4 trsMat = m4identity();
+        trsMat.m[12] = v.x;
+        trsMat.m[13] = v.y;
+        return m4multiplication(mat, trsMat);
     }
 
-    KM_INLINE matrix3 m3rotate(matrix3 mat, float deg)
+    matrix4 m4Rotate(matrix4 mat, float rot)
     {
-        float r = deg * 3.141596f  / 180.0f;
-        float c = cosf(r);
-        float s = sinf(r);
+        float c = cosf(rot);
+        float s = sinf(rot);
 
-        matrix3 m = {{{c, -s, 0.0f},
-                   {s, c, 0.0f},
-                   {0.0f, 0.0f, 1.0f}}};
-        
-        return mult(m, mat);
+        matrix4 rotMat = m4identity();
+        rotMat.m[0] = c; 
+        rotMat.m[1] = s;
+        rotMat.m[4] = -s; 
+        rotMat.m[5] = c;
+        return m4multiplication(mat , rotMat);
     }
 
-    KM_INLINE matrix3 m3scale(matrix3 mat, vector2 scale)
+
+    KM_INLINE matrix4 m4Scale(matrix4 mat,  vector2 v) 
     {
-        matrix3 m = {{{scale.x, 0.0f, 0.0f},
-                   {0.0f, scale.y, 0.0f},
-                   {0.0f, 0.0f, 1.0f}}};
-        return mult(m , mat);
-    }
+        matrix4 scaleMat = m4identity();
+        scaleMat.m[0] = v.x;
+        scaleMat.m[5] = v.y;
 
-    KM_INLINE matrix3 m3ortho(int width, int height)
-    {
-        matrix3 r = {{{ 2.0f / width,  0.0f,          -1.0f },
-                { 0.0f,         -2.0f / height,  1.0f },
-                { 0.0f,          0.0f,           1.0f }}};
-        return r;
-    }
-
-    KM_INLINE matrix3 m3lookat(matrix3 mat, vector2 dir)
-    {
-        float angle = atan2f(dir.y, dir.x) * 180.0f / 3.141596f;
-        return m3rotate(mat, angle);
-    }
+        return m4multiplication(mat, scaleMat);
+    };
     
-    KM_INLINE float *value_ptr(matrix3 *mat)
+    KM_INLINE matrix4 m4ortho(float l, float r, float b, float t)
     {
-        return &mat->value[0][0];
+        float f = 1;
+        float n = -1;
+        matrix4 ortho = m4identity();
+        ortho.m[0] = 2 / (r - l);
+        ortho.m[5] = 2 / (t - b);
+        ortho.m[10] = -2 / (f - n);
+		ortho.m[12] = -(r + l) / (r - l);
+		ortho.m[13] = -(t + b) / (t - b);
+		ortho.m[14] = -(f + n) / (f - n);
+
+        return ortho;
     }
-}
 
 #ifdef __cplusplus
+}
+
 struct vec2 : public vector2 {
     vec2(float x = 0.0f, float y = 0.0f)
     {
@@ -234,6 +221,10 @@ struct vec2 : public vector2 {
     vec2 operator+(const vec2 &o) const
     {
         return vec2(x + o.x, y + o.y);
+    }
+    vec2 operator-() const 
+    {
+        return vec2(-x, -y);
     }
     vec2 operator-(const vec2 &o) const
     {
@@ -297,49 +288,40 @@ struct vec2 : public vector2 {
     }
 };
 
-
-struct mat3: public matrix3
+struct mat4 : public matrix4
 {
-    mat3() = default;
-    mat3(const matrix3& m) : matrix3(m) {}
-    static mat3 identity()
+    mat4() = default;
+    mat4(const matrix4& m) : matrix4(m) {}  
+    mat4 operator*(const matrix4& m) const
     {
-        return m3identity();
+        return m4multiplication(m, *this);
     }
-    mat3 traslate(const vec2& v) const
+    static mat4 identity()
     {
-        return m3translate(*this, v);
+        return m4identity();
     }
-    mat3 rotate(const float d) const
+    mat4 translate(const vec2& v) const
     {
-        return m3rotate(*this, d);
+        return m4Translate(*this, v);
     }
-    mat3 scale(const vec2& v) const
+    mat4 scale(const vec2& v) const
     {
-        return m3scale(*this, v);
+        return m4Scale(*this, v);
     }
-    matrix3_FLAT flat() const 
+    mat4 rotate(float d) const
     {
-        matrix3_FLAT m = {0};
-        m.value[0] = this->value[0][0];
-        m.value[1] = this->value[1][0];
-        m.value[2] = this->value[2][0];
-
-        m.value[3] = this->value[0][1];
-        m.value[4] = this->value[1][1];
-        m.value[5] = this->value[2][1];
-
-        m.value[6] = this->value[0][2];
-        m.value[7] = this->value[1][2];
-        m.value[8] = this->value[2][2];
-
-        return m;
+        return m4Rotate(*this, d);
     }
-    float* value_ptr() 
+    static mat4 ortho(float l, float r, float b, float t)
     {
-        return &this->value[0][0];
+        return m4ortho(l, r, b, t);
+    }
+    
+    float* value_ptr(){
+        return &this->m[0];
     }
 };
+
 #endif
 
 #endif // KM_H
